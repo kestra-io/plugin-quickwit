@@ -1,11 +1,11 @@
-package io.kestra.plugin.templates;
+package io.kestra.plugin.quickwit;
 
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.property.Property;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.apache.commons.lang3.StringUtils;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -23,24 +23,32 @@ import org.slf4j.Logger;
 @Plugin(
     examples = {
         @io.kestra.core.models.annotations.Example(
-            title = "Simple revert",
-            code = { "format: \"Text to be reverted\"" }
+            title = "Reverse a string",
+            full = true,
+            code = """
+                id: example
+                namespace: company.team
+
+                tasks:
+                  - id: reverse
+                    type: io.kestra.plugin.quickwit.QuickwitTask
+                    format: "Text to be reverted"
+                """
         )
     }
 )
-public class Example extends Task implements RunnableTask<Example.Output> {
+public class QuickwitTask extends Task implements RunnableTask<QuickwitTask.Output> {
     @Schema(
         title = "Short description for this input",
         description = "Full description of this input"
     )
-    @PluginProperty(dynamic = true) // If the variables will be rendered with template {{ }}
-    private String format;
+    private Property<String> format;
 
     @Override
-    public Example.Output run(RunContext runContext) throws Exception {
+    public QuickwitTask.Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
 
-        String render = runContext.render(format);
+        String render = runContext.render(format).as(String.class).orElse("");
         logger.debug(render);
 
         return Output.builder()
