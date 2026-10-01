@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.http.HttpRequest;
+import io.kestra.core.http.HttpResponse;
 import io.kestra.core.http.client.HttpClient;
 import io.kestra.core.http.client.configurations.BasicAuthConfiguration;
 import io.kestra.core.http.client.configurations.HttpConfiguration;
@@ -184,16 +185,26 @@ public final class QuickwitService {
     }
 
     /**
-     * Runs a search and returns the parsed response.
+     * Runs a search against the configured cluster and returns the parsed response.
      *
      * @param startTimestampOverride replaces the configured start timestamp when non-null
      */
-    public static SearchResult search(HttpClient client, HttpRequest.HttpRequestBuilder request, SearchQuery query, Long startTimestampOverride) throws Exception {
+    public static SearchResult search(
+        RunContext runContext,
+        HttpClient client,
+        Property<String> url,
+        Property<Map<String, String>> headers,
+        SearchQuery query,
+        Long startTimestampOverride
+    ) throws Exception {
         // POST rather than GET: the body keeps list parameters (search_field, sort_by) and the `aggs`
         // object as proper JSON instead of the comma-separated form the query string requires.
-        HttpRequest searchRequest = request
-            .body(HttpRequest.JsonRequestBody.of(query.toBody(startTimestampOverride)))
-            .build();
+        HttpRequest searchRequest = request(
+            "POST",
+            endpoint(renderedUrl(runContext, url), pathSegment(query.index()) + "/search"),
+            renderedHeaders(runContext, headers),
+            HttpRequest.JsonRequestBody.of(query.toBody(startTimestampOverride))
+        ).build();
 
         return execute(client, searchRequest, SearchResult.class, "search on index '" + query.index() + "'");
     }
@@ -205,17 +216,12 @@ public final class QuickwitService {
      * @throws IllegalStateException when Quickwit fails, or answers 2xx with an unusable body
      */
     public static <T> T execute(HttpClient client, HttpRequest request, Class<T> type, String operation) throws Exception {
-        var response = client.request(request, String.class);
-        int status = response.getStatus().getCode();
+        var response = send(client, request, operation);
         String body = response.getBody();
-
-        if (status >= 400) {
-            throw failure(operation, status, body);
-        }
 
         if (StringUtils.isBlank(body)) {
             throw new IllegalStateException(
-                "Quickwit " + operation + " returned an empty body with HTTP " + status +
+                "Quickwit " + operation + " returned an empty body with HTTP " + response.getStatus().getCode() +
                     ", expected a JSON payload. Check that `url` points at the Quickwit REST API (default port " + DEFAULT_PORT + ")."
             );
         }
@@ -246,12 +252,24 @@ public final class QuickwitService {
      * clearing an index, toggling a source or resetting a checkpoint.
      */
     public static void executeIgnoringBody(HttpClient client, HttpRequest request, String operation) throws Exception {
+        send(client, request, operation);
+    }
+
+    /**
+     * Sends a request and returns the response, turning a failed status into an actionable exception.
+     *
+     * @param operation human readable operation name, used to turn a failure into an actionable message
+     * @throws IllegalStateException when Quickwit answers with a 4xx or 5xx
+     */
+    private static HttpResponse<String> send(HttpClient client, HttpRequest request, String operation) throws Exception {
         var response = client.request(request, String.class);
         int status = response.getStatus().getCode();
 
         if (status >= 400) {
             throw failure(operation, status, response.getBody());
         }
+
+        return response;
     }
 
     @SuppressWarnings("unchecked")

@@ -1,13 +1,21 @@
 package io.kestra.plugin.quickwit.deletetask;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import io.kestra.core.http.HttpRequest;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.plugin.quickwit.AbstractQuickwitTask;
 import io.kestra.plugin.quickwit.models.DeleteTask;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -60,16 +68,68 @@ import lombok.experimental.SuperBuilder;
         )
     }
 )
-public class Create extends AbstractQuickwitDeleteTask implements RunnableTask<Create.Output> {
+public class Create extends AbstractQuickwitTask implements RunnableTask<Create.Output> {
+    @Schema(
+        title = "Index ID",
+        description = "ID of the index to delete documents from."
+    )
+    @NotNull
+    @PluginProperty(group = "main")
+    private Property<String> index;
+
+    @Schema(
+        title = "Query",
+        description = """
+            Query selecting the documents to delete, using the
+            [Quickwit query language](https://quickwit.io/docs/reference/query-language), for example `message:trash`.
+
+            The deletion is applied asynchronously by the janitor of the cluster.
+            """
+    )
+    @NotNull
+    @PluginProperty(group = "main")
+    private Property<String> query;
+
+    @Schema(
+        title = "Start timestamp",
+        description = "Restricts the deletion to documents with `timestamp >= startTimestamp`, in seconds."
+    )
+    @PluginProperty(group = "main")
+    private Property<Long> startTimestamp;
+
+    @Schema(
+        title = "End timestamp",
+        description = "Restricts the deletion to documents with `timestamp < endTimestamp`, in seconds."
+    )
+    @PluginProperty(group = "main")
+    private Property<Long> endTimestamp;
+
+    @Schema(
+        title = "Search fields",
+        description = "Fields to search on when the query does not qualify a field name."
+    )
+    @PluginProperty(group = "processing")
+    private Property<List<String>> searchField;
+
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
+        String renderedIndex = required(runContext, this.index, "index");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("query", required(runContext, this.query, "query"));
+        putIfPresent(body, "start_timestamp", runContext.render(this.startTimestamp).as(Long.class).orElse(null));
+        putIfPresent(body, "end_timestamp", runContext.render(this.endTimestamp).as(Long.class).orElse(null));
+
+        List<String> searchField = runContext.render(this.searchField).asList(String.class);
+        if (!searchField.isEmpty()) {
+            body.put("search_field", searchField);
+        }
 
         HttpRequest request = request(
             runContext,
             "POST",
             pathSegment(renderedIndex) + "/delete-tasks",
-            HttpRequest.JsonRequestBody.of(deleteQuery(runContext))
+            HttpRequest.JsonRequestBody.of(body)
         ).build();
 
         DeleteTask deleteTask;

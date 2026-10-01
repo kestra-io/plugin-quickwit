@@ -3,7 +3,6 @@ package io.kestra.plugin.quickwit.index;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.http.HttpRequest;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -89,6 +88,19 @@ import lombok.experimental.SuperBuilder;
 )
 public class Create extends AbstractQuickwitIndex implements RunnableTask<Create.Output> {
     @Schema(
+        title = "Configuration format version",
+        description = """
+            Version of the index configuration format, which must match the version of your Quickwit
+            cluster, for example `0.8`.
+
+            Named `configVersion` and not `version` because `version` is reserved by Kestra to pin a
+            plugin version.
+            """
+    )
+    @PluginProperty(group = "main")
+    private Property<String> configVersion;
+
+    @Schema(
         title = "Doc mapping",
         description = """
             Doc mapping of the index: how documents are parsed and which fields are indexed and fast.
@@ -142,11 +154,16 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
         String renderedIndex = required(runContext, getIndex(), "index");
-        Map<String, Object> docMapping = requiredMap(runContext, this.docMapping, "docMapping");
+        Map<String, Object> docMapping = requiredMap(
+            runContext,
+            this.docMapping,
+            "docMapping",
+            "https://quickwit.io/docs/configuration/index-config#doc-mapping"
+        );
 
         // LinkedHashMap keeps the payload readable in logs and in the Quickwit API playground.
         Map<String, Object> configuration = new LinkedHashMap<>();
-        putIfPresent(configuration, "version", runContext.render(getConfigVersion()).as(String.class).orElse(null));
+        putIfPresent(configuration, "version", runContext.render(this.configVersion).as(String.class).orElse(null));
         configuration.put("index_id", renderedIndex);
         putIfPresent(configuration, "index_uri", runContext.render(this.indexUri).as(String.class).orElse(null));
         configuration.put("doc_mapping", docMapping);
@@ -167,22 +184,6 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
             .createTimestamp(metadata.getCreateTimestamp())
             .metadata(metadata)
             .build();
-    }
-
-    private static Map<String, Object> requiredMap(RunContext runContext, Property<Map<String, Object>> property, String field) throws IllegalVariableEvaluationException {
-        Map<String, Object> value = runContext.render(property).asMap(String.class, Object.class);
-
-        if (value.isEmpty()) {
-            throw new IllegalArgumentException("`" + field + "` is required and cannot be empty, see https://quickwit.io/docs/configuration/index-config#doc-mapping");
-        }
-
-        return value;
-    }
-
-    private static void putIfPresent(Map<String, Object> configuration, String key, Object value) {
-        if (value != null && !(value instanceof Map<?, ?> map && map.isEmpty())) {
-            configuration.put(key, value);
-        }
     }
 
     @Builder

@@ -13,7 +13,7 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 /**
- * Index management tasks, sharing the index ID and the format version of an index configuration.
+ * Index management tasks, sharing the index ID.
  *
  * @see <a href="https://quickwit.io/docs/reference/rest-api#index-api">Quickwit index API</a>
  */
@@ -33,17 +33,4 @@ public abstract class AbstractQuickwitIndex extends AbstractQuickwitTask {
     @NotNull
     @PluginProperty(group = "main")
     private Property<String> index;
-
-    @Schema(
-        title = "Configuration format version",
-        description = """
-            Version of the index configuration format, which must match the version of your Quickwit
-            cluster, for example `0.8`.
-
-            Named `configVersion` and not `version` because `version` is reserved by Kestra to pin a
-            plugin version.
-            """
-    )
-    @PluginProperty(group = "main")
-    private Property<String> configVersion;
 }

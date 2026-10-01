@@ -2,6 +2,7 @@ package io.kestra.plugin.quickwit.ingest;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -177,7 +178,7 @@ public class Ingest extends AbstractQuickwitTask implements RunnableTask<Ingest.
             "POST",
             pathSegment(renderedIndex) + "/ingest",
             Map.of(
-                "commit", commit.name().toLowerCase(java.util.Locale.ROOT),
+                "commit", commit.name().toLowerCase(Locale.ROOT),
                 "detailed_response", detailed
             ),
             HttpRequest.StringRequestBody.builder()

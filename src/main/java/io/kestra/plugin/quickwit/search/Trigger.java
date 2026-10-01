@@ -230,17 +230,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         var configuration = QuickwitService.httpConfiguration(runContext, this.connectTimeout, this.readTimeout, this.basicAuth);
 
         try (var client = new HttpClient(runContext, configuration)) {
-            var request = QuickwitService.request(
-                "POST",
-                QuickwitService.endpoint(
-                    QuickwitService.renderedUrl(runContext, this.url),
-                    QuickwitService.pathSegment(query.index()) + "/search"
-                ),
-                QuickwitService.renderedHeaders(runContext, this.headers),
-                null
-            );
-
-            result = QuickwitService.search(client, request, query, watermark.orElse(null));
+            result = QuickwitService.search(runContext, client, this.url, this.headers, query, watermark.orElse(null));
         }
 
         List<Map<String, Object>> documents = result.getHits() != null ? result.getHits() : List.of();
@@ -267,17 +257,10 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     }
 
     private SearchQuery searchQuery(RunContext runContext) throws IllegalVariableEvaluationException {
-        return new SearchQuery(
+        return SearchQuery.of(
             QuickwitService.requireNonBlank(runContext.render(this.index).as(String.class).orElse(null), "index"),
             QuickwitService.requireNonBlank(runContext.render(this.query).as(String.class).orElse(null), "query"),
-            null,
-            null,
-            null,
-            runContext.render(this.maxHits).as(Integer.class).orElse(null),
-            null,
-            null,
-            null,
-            null
+            runContext.render(this.maxHits).as(Integer.class).orElse(null)
         );
     }
 

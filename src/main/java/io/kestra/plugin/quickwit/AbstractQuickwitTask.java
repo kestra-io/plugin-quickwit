@@ -145,6 +145,36 @@ public abstract class AbstractQuickwitTask extends Task {
     }
 
     /**
+     * Renders a required object property, failing with an actionable message when it is missing or empty.
+     *
+     * @param documentation link to the Quickwit documentation describing the expected shape
+     */
+    protected static Map<String, Object> requiredMap(
+        RunContext runContext,
+        Property<Map<String, Object>> property,
+        String field,
+        String documentation
+    ) throws IllegalVariableEvaluationException {
+        Map<String, Object> rendered = runContext.render(property).asMap(String.class, Object.class);
+
+        if (rendered.isEmpty()) {
+            throw new IllegalArgumentException("`" + field + "` is required and cannot be empty, see " + documentation);
+        }
+
+        return rendered;
+    }
+
+    /**
+     * Adds an optional value to a request body, omitting it when unset so Quickwit applies its own
+     * default rather than rejecting an empty or null value.
+     */
+    protected static void putIfPresent(Map<String, Object> body, String key, Object value) {
+        if (value != null && !(value instanceof Map<?, ?> map && map.isEmpty())) {
+            body.put(key, value);
+        }
+    }
+
+    /**
      * Optional basic authentication, for clusters exposed through a reverse proxy or a gateway.
      */
     @SuperBuilder

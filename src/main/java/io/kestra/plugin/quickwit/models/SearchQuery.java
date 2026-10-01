@@ -38,6 +38,14 @@ public record SearchQuery(
     Map<String, Object> aggregations
 ) {
     /**
+     * A search restricted to an index, a query and a hit limit, leaving every other parameter to
+     * Quickwit. Used by callers that do not expose the full set of search parameters.
+     */
+    public static SearchQuery of(String index, String query, Integer maxHits) {
+        return new SearchQuery(index, query, null, null, null, maxHits, null, null, null, null);
+    }
+
+    /**
      * Builds the JSON body of the search request.
      *
      * <p>Optional parameters are omitted when unset so Quickwit applies its own defaults, and lists

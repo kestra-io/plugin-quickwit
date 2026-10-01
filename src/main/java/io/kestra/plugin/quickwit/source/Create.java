@@ -122,14 +122,15 @@ public class Create extends AbstractQuickwitSource implements RunnableTask<Creat
     public Create.Output run(RunContext runContext) throws Exception {
         String renderedIndex = required(runContext, getIndex(), "index");
         String renderedSource = required(runContext, getSource(), "source");
-
-        Map<String, Object> params = runContext.render(this.params).asMap(String.class, Object.class);
-        if (params.isEmpty()) {
-            throw new IllegalArgumentException("`params` is required and cannot be empty, see https://quickwit.io/docs/configuration/source-config");
-        }
+        Map<String, Object> params = requiredMap(
+            runContext,
+            this.params,
+            "params",
+            "https://quickwit.io/docs/configuration/source-config"
+        );
 
         Map<String, Object> configuration = new LinkedHashMap<>();
-        putIfPresent(configuration, "version", runContext.render(getConfigVersion()).as(String.class).orElse(null));
+        putIfPresent(configuration, "version", runContext.render(this.configVersion).as(String.class).orElse(null));
         configuration.put("source_id", renderedSource);
         configuration.put("source_type", required(runContext, this.sourceType, "sourceType"));
         configuration.put("params", params);
@@ -152,12 +153,6 @@ public class Create extends AbstractQuickwitSource implements RunnableTask<Creat
             .index(renderedIndex)
             .source(source)
             .build();
-    }
-
-    private static void putIfPresent(Map<String, Object> configuration, String key, Object value) {
-        if (value != null) {
-            configuration.put(key, value);
-        }
     }
 
     @Builder

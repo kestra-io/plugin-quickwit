@@ -18,13 +18,18 @@
 
 Single-module plugin. Source packages under `io.kestra.plugin`:
 
-- `quickwit` — `AbstractQuickwitTask` (shared connection properties), `QuickwitService` (endpoint building,
-  request creation, response and error handling), `models` (API response POJOs)
-- `quickwit.search` — `Search`, `Trigger`, `AbstractQuickwitSearch`
+- `quickwit` — `AbstractQuickwitTask` (shared connection properties and request-body helpers),
+  `QuickwitService` (endpoint building, request creation, response and error handling),
+  `models` (API response POJOs)
+- `quickwit.search` — `Search`, `Trigger`
 - `quickwit.ingest` — `Ingest`, `Commit`
 - `quickwit.index` — `Create`, `Get`, `List`, `Delete`, `Clear`, `AbstractQuickwitIndex`
 - `quickwit.source` — `Create`, `Toggle`, `Delete`, `ResetCheckpoint`, `AbstractQuickwitSource`
-- `quickwit.deletetask` — `Create`, `List`, `AbstractQuickwitDeleteTask`
+- `quickwit.deletetask` — `Create`, `List`
+
+A base class only exists when it has more than one subclass: a trigger extends `AbstractTrigger`, not
+`Task`, so `search` and `deletetask` keep their properties on the concrete components instead of
+declaring an abstract class a single task would extend.
 
 No plugin class lives in the root package: `lintPluginDocs` rejects it (PKG-003). Infrastructure
 dependencies (Docker Compose services):

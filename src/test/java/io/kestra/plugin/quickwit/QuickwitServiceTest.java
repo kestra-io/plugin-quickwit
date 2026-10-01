@@ -136,7 +136,7 @@ class QuickwitServiceTest extends AbstractQuickwitTest {
 
     @Test
     void searchQueryOmitsUnsetOptionalParameters() {
-        var body = new SearchQuery("app-logs", "severity:ERROR", null, null, null, null, null, null, null, null).toBody(null);
+        var body = SearchQuery.of("app-logs", "severity:ERROR", null).toBody(null);
 
         assertThat(body, is(Map.of("query", "severity:ERROR")));
     }
