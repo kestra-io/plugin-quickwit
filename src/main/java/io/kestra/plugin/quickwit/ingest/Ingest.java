@@ -21,7 +21,6 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.plugin.quickwit.AbstractQuickwitTask;
-import io.kestra.plugin.quickwit.QuickwitService;
 import io.kestra.plugin.quickwit.models.IngestResult;
 
 import io.swagger.v3.oas.annotations.media.Schema;

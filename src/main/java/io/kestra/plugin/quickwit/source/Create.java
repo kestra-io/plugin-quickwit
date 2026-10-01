@@ -3,7 +3,6 @@ package io.kestra.plugin.quickwit.source;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.http.HttpRequest;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
