@@ -1,8 +1,6 @@
 package io.kestra.plugin.quickwit;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -141,7 +139,7 @@ public abstract class AbstractQuickwitTask extends Task {
     }
 
     protected static String pathSegment(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return QuickwitService.pathSegment(value);
     }
 
     /** Renders a required string property, failing with an actionable message when it is missing. */

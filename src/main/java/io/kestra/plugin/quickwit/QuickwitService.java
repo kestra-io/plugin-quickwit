@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -14,7 +15,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.http.HttpRequest;
 import io.kestra.core.http.client.HttpClient;
-import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.http.client.configurations.BasicAuthConfiguration;
 import io.kestra.core.http.client.configurations.HttpConfiguration;
 import io.kestra.core.http.client.configurations.TimeoutConfiguration;
@@ -49,13 +49,15 @@ public final class QuickwitService {
     /** Default TCP port of a Quickwit node. */
     public static final int DEFAULT_PORT = 7280;
 
-    private static final String BODY_MARKER = "and body:";
-
     private QuickwitService() {
     }
 
     /**
      * Builds the HTTP client configuration from the connection properties of a task or trigger.
+     *
+     * <p>{@code allowFailed} is enabled on purpose: the status and the raw body are inspected by
+     * {@link #execute} so that Quickwit's own error message reaches the user verbatim. The client would
+     * otherwise render it into an exception message that {@code HttpException} sanitizes.
      *
      * @param basicAuth credentials for deployments fronted by a proxy, {@code null} for a bare Quickwit node
      */
@@ -78,7 +80,8 @@ public final class QuickwitService {
         }
 
         var builder = HttpConfiguration.builder()
-            .timeout(timeout.build());
+            .timeout(timeout.build())
+            .allowFailed(Property.ofValue(true));
 
         if (basicAuth != null) {
             builder.auth(
@@ -148,7 +151,7 @@ public final class QuickwitService {
             .stream()
             .filter(e -> e.getValue() != null)
             .map(e -> e.getKey() + "=" + URLEncoder.encode(String.valueOf(e.getValue()), StandardCharsets.UTF_8))
-            .collect(java.util.stream.Collectors.joining("&"));
+            .collect(Collectors.joining("&"));
 
         return URI.create(queryString.isEmpty() ? base : base + "?" + queryString);
     }
@@ -163,7 +166,9 @@ public final class QuickwitService {
      * @see <a href="https://quickwit.io/docs/reference/rest-api#parameters">Parameters</a>
      */
     public static String pathSegment(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        // URLEncoder targets form-encoded data where a space becomes '+'; inside a URI path that would
+        // be a literal plus sign, so the percent-encoded form Quickwit expects is used instead.
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     /** Creates a request carrying the configured headers. */
@@ -176,11 +181,6 @@ public final class QuickwitService {
         headers.forEach(builder::addHeader);
 
         return builder.body(body);
-    }
-
-    /** Builds a POST request carrying a JSON body, the standard shape for the Quickwit write APIs. */
-    public static HttpRequest jsonRequest(String url, String path, Map<String, String> headers, Object body) {
-        return request("POST", endpoint(url, path), headers, HttpRequest.JsonRequestBody.of(body)).build();
     }
 
     /**
@@ -202,24 +202,25 @@ public final class QuickwitService {
      * Executes a request and returns the deserialized response body.
      *
      * @param operation human readable operation name, used to turn a failure into an actionable message
-     * @throws IllegalStateException when Quickwit answers 2xx but sends no parsable body
+     * @throws IllegalStateException when Quickwit fails, or answers 2xx with an unusable body
      */
     public static <T> T execute(HttpClient client, HttpRequest request, Class<T> type, String operation) throws Exception {
-        try {
-            var response = client.request(request, type);
+        var response = client.request(request, String.class);
+        int status = response.getStatus().getCode();
+        String body = response.getBody();
 
-            T body = response.getBody();
-            if (body == null) {
-                throw new IllegalStateException(
-                    "Quickwit " + operation + " returned an empty body with HTTP " + response.getStatus().getCode() +
-                        ", expected a JSON payload. Check that `url` points at the Quickwit REST API (default port " + DEFAULT_PORT + ")."
-                );
-            }
-
-            return body;
-        } catch (HttpClientResponseException e) {
-            throw failure(e, operation);
+        if (status >= 400) {
+            throw failure(operation, status, body);
         }
+
+        if (StringUtils.isBlank(body)) {
+            throw new IllegalStateException(
+                "Quickwit " + operation + " returned an empty body with HTTP " + status +
+                    ", expected a JSON payload. Check that `url` points at the Quickwit REST API (default port " + DEFAULT_PORT + ")."
+            );
+        }
+
+        return parse(body, type, operation);
     }
 
     /**
@@ -245,20 +246,29 @@ public final class QuickwitService {
      * clearing an index, toggling a source or resetting a checkpoint.
      */
     public static void executeIgnoringBody(HttpClient client, HttpRequest request, String operation) throws Exception {
-        try {
-            client.request(request, String.class);
-        } catch (HttpClientResponseException e) {
-            throw failure(e, operation);
+        var response = client.request(request, String.class);
+        int status = response.getStatus().getCode();
+
+        if (status >= 400) {
+            throw failure(operation, status, response.getBody());
         }
     }
 
-    private static IllegalStateException failure(HttpClientResponseException e, String operation) {
-        int status = e.getResponse() != null && e.getResponse().getStatus() != null ? e.getResponse().getStatus().getCode() : 0;
+    @SuppressWarnings("unchecked")
+    private static <T> T parse(String body, Class<T> type, String operation) {
+        if (type == String.class) {
+            return (T) body;
+        }
 
-        return new IllegalStateException(
-            "Quickwit " + operation + " failed with HTTP " + status + ": " + failureMessage(e),
-            e
-        );
+        try {
+            return JacksonMapper.ofJson().readValue(body, type);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Quickwit " + operation + " returned a body that is not valid JSON: " + e.getOriginalMessage(), e);
+        }
+    }
+
+    private static IllegalStateException failure(String operation, int status, String body) {
+        return new IllegalStateException("Quickwit " + operation + " failed with HTTP " + status + ": " + quickwitMessage(body));
     }
 
     /**
@@ -269,21 +279,18 @@ public final class QuickwitService {
      *
      * @see <a href="https://quickwit.io/docs/reference/rest-api#error-handling">Error handling</a>
      */
-    public static String failureMessage(HttpClientResponseException exception) {
-        String message = exception.getMessage();
-
-        int marker = message == null ? -1 : message.indexOf(BODY_MARKER);
-        if (marker < 0) {
-            return message;
+    public static String quickwitMessage(String body) {
+        if (StringUtils.isBlank(body)) {
+            return "no response body";
         }
 
-        String body = message.substring(marker + BODY_MARKER.length()).strip();
+        String trimmed = body.strip();
         try {
-            Object quickwitMessage = JacksonMapper.toMap(body).get("message");
-            return quickwitMessage != null ? String.valueOf(quickwitMessage) : body;
+            Object message = JacksonMapper.toMap(trimmed).get("message");
+            return message != null ? String.valueOf(message) : trimmed;
         } catch (Exception e) {
-            // not a JSON error object: surface the raw body rather than a parsing failure
-            return body;
+            // not a JSON error object, for example an HTML page served by a proxy: surface it as-is
+            return trimmed;
         }
     }
 
