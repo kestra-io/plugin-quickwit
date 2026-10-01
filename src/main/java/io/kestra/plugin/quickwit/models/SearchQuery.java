@@ -48,8 +48,8 @@ public record SearchQuery(
     /**
      * Builds the JSON body of the search request.
      *
-     * <p>Optional parameters are omitted when unset so Quickwit applies its own defaults, and lists
-     * are sent as JSON arrays rather than the comma-separated form the query string requires.
+     * <p>Optional parameters are omitted when unset so Quickwit applies its own defaults, and the
+     * list parameters are sent as comma-separated strings, which is what this endpoint accepts.
      *
      * @param startTimestampOverride replaces {@link #startTimestamp} when non-null; the trigger uses
      *                               this to poll the window that follows its last watermark
@@ -72,9 +72,9 @@ public record SearchQuery(
             body.put("max_hits", this.maxHits);
         }
 
-        putIfNotEmpty(body, "search_field", this.searchField);
-        putIfNotEmpty(body, "snippet_fields", this.snippetFields);
-        putIfNotEmpty(body, "sort_by", this.sortBy);
+        putCsv(body, "search_field", this.searchField);
+        putCsv(body, "snippet_fields", this.snippetFields);
+        putCsv(body, "sort_by", this.sortBy);
 
         if (this.aggregations != null && !this.aggregations.isEmpty()) {
             body.put("aggs", this.aggregations);
@@ -83,9 +83,18 @@ public record SearchQuery(
         return body;
     }
 
-    private static void putIfNotEmpty(Map<String, Object> body, String key, List<String> values) {
+    /**
+     * Sends a list as the comma-separated string the search API expects.
+     *
+     * <p>The request body is deserialized into plain string fields, so a JSON array is rejected with
+     * {@code invalid type: sequence, expected a string}. The delete task endpoint is the opposite:
+     * it wants {@code search_fields} as an array, which {@code deletetask.Create} sends.
+     *
+     * @see <a href="https://quickwit.io/docs/reference/rest-api#search-in-an-index">Search API</a>
+     */
+    private static void putCsv(Map<String, Object> body, String key, List<String> values) {
         if (values != null && !values.isEmpty()) {
-            body.put(key, values);
+            body.put(key, String.join(",", values));
         }
     }
 }

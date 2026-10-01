@@ -56,7 +56,7 @@ tasks:
     url: "https://quickwit.example.com:7280"
     index: app-logs
     query: "severity:ERROR"
-    startTimestamp: "{{ now() | dateAdd(-1, 'HOURS') | date('X') }}"
+    startTimestamp: "{{ now() | dateAdd(-1, 'HOURS') | timestamp }}"
     maxHits: 100
     fetchType: FETCH
 
@@ -180,8 +180,8 @@ queued; the cluster's janitor applies it asynchronously.
   url: "http://localhost:7280"
   index: app-logs
   query: "*"
-  startTimestamp: "{{ now() | dateAdd(-30, 'DAYS') | date('X') }}"
-  endTimestamp: "{{ now() | dateAdd(-29, 'DAYS') | date('X') }}"
+  startTimestamp: "{{ now() | dateAdd(-30, 'DAYS') | timestamp }}"
+  endTimestamp: "{{ now() | dateAdd(-29, 'DAYS') | timestamp }}"
 ```
 
 ## Errors
@@ -205,7 +205,8 @@ Point `url` at a node that serves what you call, or at a load balancer in front 
 ## Running a local cluster
 
 ```bash
-docker run -p 7280:7280 quickwit/quickwit:latest
+# the image entrypoint is a bare `quickwit`, so the `run` subcommand is required
+docker run -p 7280:7280 quickwit/quickwit:latest run
 ```
 
 Then verify the API is up before running a flow:

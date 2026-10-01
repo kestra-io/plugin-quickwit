@@ -1,11 +1,11 @@
-version: "3.8"
-
 services:
   # A single Quickwit node with every service enabled, so the plugin can be exercised against a real
   # cluster. The REST API answers on 7280, which is the port the task examples use.
   # https://quickwit.io/docs/get-started/installation
   quickwit:
     image: quickwit/quickwit:latest
+    # the image entrypoint is a bare `quickwit`, so without this the container prints its usage and exits
+    command: run
     environment:
       # a single node runs every service in one process; no discovery to configure
       QW_CLUSTER_ID: quickwit-local

@@ -77,7 +77,7 @@ import reactor.core.publisher.Flux;
                     url: "https://quickwit.example.com:7280"
                     index: app-logs
                     query: "severity:ERROR"
-                    startTimestamp: "{{ now() | dateAdd(-1, 'HOURS') | date('X') }}"
+                    startTimestamp: "{{ now() | dateAdd(-1, 'HOURS') | timestamp }}"
                     maxHits: 100
                     fetchType: FETCH
 
@@ -101,7 +101,7 @@ import reactor.core.publisher.Flux;
                       Authorization: "Bearer {{ secret('QUICKWIT_GATEWAY_TOKEN') }}"
                     index: app-logs
                     query: "severity:ERROR"
-                    startTimestamp: "{{ now() | dateAdd(-1, 'DAYS') | date('X') }}"
+                    startTimestamp: "{{ now() | dateAdd(-1, 'DAYS') | timestamp }}"
                     aggregations:
                       service:
                         terms:

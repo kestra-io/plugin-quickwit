@@ -29,6 +29,9 @@ import static org.hamcrest.Matchers.notNullValue;
  * {@code metadata/index.yaml}, which is also the file that rule requires for the plugin root, so both
  * expectations can never hold at once. Unlike the linter, this test reads the package-to-file mapping
  * directly, keyed by the {@code group} each file declares, so there is no collision to resolve.
+ *
+ * <p>It also guards the example snippets against templates that Kestra cannot render, for the same
+ * reason: the linter checks that an example is valid YAML, not that its expressions evaluate.
  */
 class MetadataConsistencyTest extends AbstractQuickwitTest {
     private static final String ROOT = "io.kestra.plugin.quickwit";
@@ -104,6 +107,36 @@ class MetadataConsistencyTest extends AbstractQuickwitTest {
         } catch (IOException e) {
             throw new AssertionError("Unable to read " + doc, e);
         }
+    }
+
+    /**
+     * Guards the examples against {@code date('X')}, which is not a Kestra filter.
+     *
+     * <p>Kestra renders with Jinjava, which has no {@code date} filter: {@code now() | date('X')}
+     * yields the literal string {@code "Z"}. In a search task that fails loudly on a
+     * {@code Long} property, but in an ingest example it is worse, because every document is
+     * rejected by Quickwit with {@code failed to parse datetime 'Z'} while the task still reports
+     * success. {@code timestamp} is the filter that yields unix seconds. Nothing in
+     * {@code lintPluginDocs} can catch this, because the snippets are valid YAML.
+     */
+    @Test
+    void noExampleUsesTheDateXFilter() throws IOException {
+        List<String> offenders = new ArrayList<>();
+
+        try (Stream<Path> files = Files.walk(Path.of("src", "main", "java"))) {
+            for (Path file : files.filter(p -> p.toString().endsWith(".java")).toList()) {
+                if (Files.readString(file).contains("date('X')")) {
+                    offenders.add(file.toString());
+                }
+            }
+        }
+
+        Path doc = Path.of("src", "main", "resources", "doc", ROOT + ".md");
+        if (Files.readString(doc).contains("date('X')")) {
+            offenders.add(doc.toString());
+        }
+
+        assertThat("use `now() | timestamp` instead of `now() | date('X')`", offenders, is(List.of()));
     }
 
     /** Maps each documented package to its metadata file, keyed by the {@code group} the file declares. */

@@ -58,8 +58,8 @@ import lombok.experimental.SuperBuilder;
                     url: "http://localhost:7280"
                     index: app-logs
                     query: "*"
-                    startTimestamp: "{{ now() | dateAdd(-30, 'DAYS') | date('X') }}"
-                    endTimestamp: "{{ now() | dateAdd(-29, 'DAYS') | date('X') }}"
+                    startTimestamp: "{{ now() | dateAdd(-30, 'DAYS') | timestamp }}"
+                    endTimestamp: "{{ now() | dateAdd(-29, 'DAYS') | timestamp }}"
 
                   - id: report
                     type: io.kestra.plugin.core.log.Log
@@ -122,7 +122,9 @@ public class Create extends AbstractQuickwitTask implements RunnableTask<Create.
 
         List<String> searchField = runContext.render(this.searchField).asList(String.class);
         if (!searchField.isEmpty()) {
-            body.put("search_field", searchField);
+            // plural here, unlike the singular `search_field` of the search API, and an array rather
+            // than the comma-separated string that endpoint takes
+            body.put("search_fields", searchField);
         }
 
         HttpRequest request = request(

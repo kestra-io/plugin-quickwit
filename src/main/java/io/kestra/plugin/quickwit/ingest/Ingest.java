@@ -95,11 +95,11 @@ import lombok.experimental.SuperBuilder;
                     commit: FORCE
                     detailedResponse: true
                     from:
-                      - timestamp: "{{ now() | date('X') }}"
+                      - timestamp: "{{ now() | timestamp }}"
                         service: checkout
                         severity: ERROR
                         message: "Payment gateway timeout"
-                      - timestamp: "{{ now() | date('X') }}"
+                      - timestamp: "{{ now() | timestamp }}"
                         service: checkout
                         severity: ERROR
                         message: "Payment gateway timeout"

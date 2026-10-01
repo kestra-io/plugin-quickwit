@@ -75,13 +75,17 @@ class SearchTest extends AbstractQuickwitTest {
             .startOffset(Property.ofValue(5))
             .maxHits(Property.ofValue(100))
             .searchField(Property.ofValue(List.of("message", "severity")))
+            .snippetFields(Property.ofValue(List.of("message")))
             .sortBy(Property.ofValue(List.of("timestamp")))
             .aggregations(Property.ofValue(Map.of("severity", Map.of("type", "terms"))))
             .build()
             .run(runContextFactory.of());
 
-        // POST keeps search_field/sort_by as JSON arrays and aggs as a nested object, which the
-        // query string form of the GET endpoint cannot express
+        // POST carries aggs as a nested object, which the query string form of the GET endpoint cannot
+        // express. The list parameters are comma-separated strings: the search API deserializes them
+        // into plain string fields and rejects a JSON array with
+        // `invalid type: sequence, expected a string`. Note the singular `search_field` here, against
+        // the plural `search_fields` of the delete task API.
         verify(postRequestedFor(urlPathEqualTo("/api/v1/app-logs/search"))
             .withRequestBody(equalToJson("""
                 {
@@ -90,8 +94,9 @@ class SearchTest extends AbstractQuickwitTest {
                   "end_timestamp": 2000,
                   "start_offset": 5,
                   "max_hits": 100,
-                  "search_field": ["message", "severity"],
-                  "sort_by": ["timestamp"],
+                  "search_field": "message,severity",
+                  "snippet_fields": "message",
+                  "sort_by": "timestamp",
                   "aggs": {"severity": {"type": "terms"}}
                 }
                 """))

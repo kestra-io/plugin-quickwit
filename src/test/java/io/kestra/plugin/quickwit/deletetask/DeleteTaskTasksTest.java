@@ -61,13 +61,16 @@ class DeleteTaskTasksTest extends AbstractQuickwitTest {
         assertThat(output.getDeleteTask().getDeleteQuery().getQuery(), is("message:trash"));
         assertThat(output.getDeleteTask().getDeleteQuery().getSearchField(), is(List.of("message")));
 
+        // `search_fields`, plural, and an array: the delete task API names it differently from the
+        // search API and takes the opposite encoding, rejecting `search_field` outright with
+        // `unknown field 'search_field', expected one of 'query', 'search_fields', ...`
         verify(postRequestedFor(urlPathEqualTo("/api/v1/app-logs/delete-tasks"))
             .withRequestBody(equalToJson("""
                 {
                   "query": "message:trash",
                   "start_timestamp": 1699000000,
                   "end_timestamp": 1700000000,
-                  "search_field": ["message"]
+                  "search_fields": ["message"]
                 }
                 """))
         );

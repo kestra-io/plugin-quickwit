@@ -142,7 +142,7 @@ class QuickwitServiceTest extends AbstractQuickwitTest {
     }
 
     @Test
-    void searchQueryKeepsListsAsJsonArrays() {
+    void searchQuerySendsListsAsCommaSeparatedStrings() {
         var body = new SearchQuery(
             "app-logs",
             "*",
@@ -150,8 +150,8 @@ class QuickwitServiceTest extends AbstractQuickwitTest {
             200L,
             0,
             10,
+            List.of("message", "severity"),
             List.of("message"),
-            null,
             List.of("timestamp"),
             Map.of("severity", Map.of("type", "terms"))
         ).toBody(null);
@@ -160,9 +160,31 @@ class QuickwitServiceTest extends AbstractQuickwitTest {
         assertThat(body.get("end_timestamp"), is(200L));
         assertThat(body.get("start_offset"), is(0));
         assertThat(body.get("max_hits"), is(10));
-        assertThat(body.get("search_field"), is(List.of("message")));
-        assertThat(body.get("sort_by"), is(List.of("timestamp")));
         assertThat(body.get("aggs"), is(Map.of("severity", Map.of("type", "terms"))));
+
+        // the search API deserializes these three into plain string fields, so a JSON array is
+        // rejected with `invalid type: sequence, expected a string`
+        assertThat(body.get("search_field"), is("message,severity"));
+        assertThat(body.get("snippet_fields"), is("message"));
+        assertThat(body.get("sort_by"), is("timestamp"));
+    }
+
+    @Test
+    void searchQueryOmitsEmptyLists() {
+        var body = new SearchQuery(
+            "app-logs",
+            "*",
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            null,
+            null,
+            null
+        ).toBody(null);
+
+        assertThat(body, is(Map.of("query", "*")));
     }
 
     @Test

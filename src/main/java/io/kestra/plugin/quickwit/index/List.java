@@ -46,7 +46,7 @@ import lombok.experimental.SuperBuilder;
 
                   - id: report
                     type: io.kestra.plugin.core.log.Log
-                    message: "{{ outputs.list.indexes | map(indexConfig.index_id) | join(', ') }}"
+                    message: "{{ outputs.list.indexes | jq('.[] | .index_config.index_id') | join(', ') }}"
                 """
         )
     }
