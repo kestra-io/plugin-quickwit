@@ -1,0 +1,83 @@
+package io.kestra.plugin.quickwit.models;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
+/**
+ * The parameters of a Quickwit search, independent of whether the search is run by the
+ * {@code Search} task or by the {@code Trigger}.
+ *
+ * @param index ID of the index, or a multi-target expression such as `app-logs*`
+ * @param query query text, in the Quickwit query language
+ * @param startTimestamp restricts results to {@code timestamp >= startTimestamp}, in seconds
+ * @param endTimestamp restricts results to {@code timestamp < endTimestamp}, in seconds
+ * @param startOffset number of documents to skip
+ * @param maxHits maximum number of documents to return
+ * @param searchField fields to search on when the query does not qualify a field name
+ * @param snippetFields fields to extract snippets on
+ * @param sortBy fields to sort the results on
+ * @param aggregations aggregation request
+ */
+@Schema(
+    title = "Search query",
+    description = "Parameters of a Quickwit search request."
+)
+public record SearchQuery(
+    String index,
+    String query,
+    Long startTimestamp,
+    Long endTimestamp,
+    Integer startOffset,
+    Integer maxHits,
+    List<String> searchField,
+    List<String> snippetFields,
+    List<String> sortBy,
+    Map<String, Object> aggregations
+) {
+    /**
+     * Builds the JSON body of the search request.
+     *
+     * <p>Optional parameters are omitted when unset so Quickwit applies its own defaults, and lists
+     * are sent as JSON arrays rather than the comma-separated form the query string requires.
+     *
+     * @param startTimestampOverride replaces {@link #startTimestamp} when non-null; the trigger uses
+     *                               this to poll the window that follows its last watermark
+     */
+    public Map<String, Object> toBody(Long startTimestampOverride) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("query", this.query);
+
+        Long start = startTimestampOverride != null ? startTimestampOverride : this.startTimestamp;
+        if (start != null) {
+            body.put("start_timestamp", start);
+        }
+        if (this.endTimestamp != null) {
+            body.put("end_timestamp", this.endTimestamp);
+        }
+        if (this.startOffset != null) {
+            body.put("start_offset", this.startOffset);
+        }
+        if (this.maxHits != null) {
+            body.put("max_hits", this.maxHits);
+        }
+
+        putIfNotEmpty(body, "search_field", this.searchField);
+        putIfNotEmpty(body, "snippet_fields", this.snippetFields);
+        putIfNotEmpty(body, "sort_by", this.sortBy);
+
+        if (this.aggregations != null && !this.aggregations.isEmpty()) {
+            body.put("aggs", this.aggregations);
+        }
+
+        return body;
+    }
+
+    private static void putIfNotEmpty(Map<String, Object> body, String key, List<String> values) {
+        if (values != null && !values.isEmpty()) {
+            body.put(key, values);
+        }
+    }
+}
