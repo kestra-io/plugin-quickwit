@@ -2,6 +2,9 @@ package io.kestra.plugin.quickwit.search;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -223,14 +226,15 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             """
     )
     @PluginProperty(group = "processing")
+    @Min(1)
     private Property<Integer> maxHits;
 
     @Schema(
         title = "State key",
         description = """
             KV Store key holding the watermark of this trigger.
-            Defaults to `<namespace>_<flowId>_<triggerId>`; change it only to deliberately share a
-            watermark between triggers.
+            Defaults to `<namespace>`, `<flowId>` and `<triggerId>`, each prefixed by its length, e.g. `7-company_7-my_flow_2-on`.
+            Change it only to deliberately share a watermark between triggers.
             """
     )
     @PluginProperty(group = "advanced")
@@ -264,8 +268,23 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             return Optional.empty();
         }
 
-        long advanced = maxTimestamp(documents, rTimestampField) + 1;
-        writeWatermark(runContext, key, advanced);
+        long max = maxTimestamp(documents, rTimestampField);
+        long advanced = max + 1;
+
+        // When Quickwit truncated the page, it may end in the middle of second `max`: hold that second
+        // back and re-read it whole on the next poll, unless the page holds nothing but that second.
+        if (result.getNumHits() != null && result.getNumHits() > documents.size()) {
+            List<Map<String, Object>> complete = new ArrayList<>();
+            for (int i = 0; i < documents.size(); i++) {
+                if (timestamp(documents.get(i), rTimestampField, i) < max) {
+                    complete.add(documents.get(i));
+                }
+            }
+            if (!complete.isEmpty()) {
+                documents = complete;
+                advanced = max;
+            }
+        }
 
         logger.info("Triggering on {} new document(s) on index '{}'", documents.size(), query.index());
 
@@ -276,15 +295,19 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             .watermark(advanced)
             .build();
 
-        return Optional.of(TriggerService.generateExecution(this, conditionContext, context, output));
+        // generate the execution first so a failure there does not advance the watermark past undelivered documents
+        Execution execution = TriggerService.generateExecution(this, conditionContext, context, output);
+        writeWatermark(runContext, key, advanced);
+
+        return Optional.of(execution);
     }
 
     private SearchQuery searchQuery(RunContext runContext, String rTimestampField) throws IllegalVariableEvaluationException {
         String rIndex = QuickwitService.requireNonBlank(runContext.render(this.index).as(String.class).orElse(null), "index");
         String rQuery = QuickwitService.requireNonBlank(runContext.render(this.query).as(String.class).orElse(null), "query");
-        Integer rMaxHits = runContext.render(this.maxHits).as(Integer.class).orElse(null);
+        Integer rMaxHits = QuickwitService.requireAtLeast(runContext.render(this.maxHits).as(Integer.class).orElse(null), 1, "maxHits");
 
-        return new SearchQuery(rIndex, rQuery, null, null, null, rMaxHits, null, null, List.of("+" + rTimestampField), null);
+        return new SearchQuery(rIndex, rQuery, null, null, null, rMaxHits, null, null, List.of("-" + rTimestampField), null);
     }
 
     private String stateKey(RunContext runContext, TriggerContext context) throws IllegalVariableEvaluationException {
@@ -314,34 +337,49 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     /**
      * Maximum event timestamp across the delivered documents.
      *
-     * @throws IllegalStateException when a document misses the timestamp field or holds a non-numeric value
+     * @throws IllegalStateException when a document misses the timestamp field or holds an unparsable value
      */
     private static long maxTimestamp(List<Map<String, Object>> documents, String timestampField) {
         long max = Long.MIN_VALUE;
 
         for (int i = 0; i < documents.size(); i++) {
-            Object value = documents.get(i).get(timestampField);
-            if (value == null) {
-                throw new IllegalStateException("Document at position " + i + " misses timestamp field '" + timestampField + "', cannot advance the watermark");
-            }
-
-            long timestamp;
-            if (value instanceof Number number) {
-                timestamp = number.longValue();
-            } else {
-                try {
-                    timestamp = Long.parseLong(String.valueOf(value).trim());
-                } catch (NumberFormatException e) {
-                    throw new IllegalStateException("Document at position " + i + " holds a non-numeric timestamp field '" + timestampField + "': " + value, e);
-                }
-            }
-
-            if (timestamp > max) {
-                max = timestamp;
-            }
+            max = Math.max(max, timestamp(documents.get(i), timestampField, i));
         }
 
         return max;
+    }
+
+    /**
+     * Event timestamp of a document, in seconds.
+     *
+     * <p>Quickwit renders datetime fields with their {@code output_format}: an RFC 3339 string by default, or
+     * a number for {@code unix_timestamp_secs}. Other numeric output formats (millis, micros, nanos) are not
+     * supported since they cannot be told apart from seconds.
+     */
+    private static long timestamp(Map<String, Object> document, String timestampField, int position) {
+        Object value = document.get(timestampField);
+        if (value == null) {
+            throw new IllegalStateException("Document at position " + position + " misses timestamp field '" + timestampField + "', cannot advance the watermark");
+        }
+
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+
+        String text = String.valueOf(value).trim();
+        try {
+            return OffsetDateTime.parse(text).toEpochSecond();
+        } catch (DateTimeParseException e) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                throw new IllegalStateException(
+                    "Document at position " + position + " holds timestamp field '" + timestampField + "' = '" + text +
+                        "', expected an RFC 3339 datetime or a number of seconds; set the field's `output_format` to `rfc3339` or `unix_timestamp_secs`",
+                    e
+                );
+            }
+        }
     }
 
     private void writeWatermark(RunContext runContext, String key, long watermark) throws Exception {
@@ -354,9 +392,13 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         );
     }
 
-    /** Default watermark key, aligned with the convention used by the other stateful Kestra triggers. */
+    /**
+     * Default watermark key. Each part is length-prefixed so that, for example, namespace {@code a_b} with
+     * flow {@code c} and namespace {@code a} with flow {@code b_c} get different keys. Only {@code -} and
+     * {@code _} are used as separators since a KV key must match {@code [a-zA-Z0-9][a-zA-Z0-9._-]*}.
+     */
     private static String defaultKey(String namespace, String flowId, String triggerId) {
-        return String.join("_", namespace, flowId, triggerId);
+        return String.format("%d-%s_%d-%s_%d-%s", namespace.length(), namespace, flowId.length(), flowId, triggerId.length(), triggerId);
     }
 
     @Builder

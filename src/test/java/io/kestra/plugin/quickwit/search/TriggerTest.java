@@ -132,6 +132,54 @@ class TriggerTest extends AbstractQuickwitTest {
     }
 
     @Test
+    void readsRfc3339Timestamps(WireMockRuntimeInfo wireMock) throws Exception {
+        // rfc3339 is the default `output_format` of a Quickwit datetime field
+        stubFor(post(urlPathEqualTo("/api/v1/app-logs/search")).willReturn(okJson(
+            """
+                {"num_hits": 2, "hits": [{"timestamp": "2023-11-14T22:13:21Z", "message": "one"}, {"timestamp": "2023-11-14T22:13:22.5+00:00", "message": "two"}]}
+                """)));
+
+        var context = contextFor(trigger(wireMock));
+
+        assertThat(context.trigger().evaluate(context.conditionContext(), context.triggerContext()).isPresent(), is(true));
+        assertThat(watermark(context), is("1700000003"));
+    }
+
+    @Test
+    void holdsBackTheLastSecondOfATruncatedPage(WireMockRuntimeInfo wireMock) throws Exception {
+        // 3 documents match, the page holds 2 and ends inside second 1700000002
+        stubFor(post(urlPathEqualTo("/api/v1/app-logs/search")).willReturn(okJson(
+            """
+                {"num_hits": 3, "hits": [{"timestamp": 1700000001, "message": "one"}, {"timestamp": 1700000002, "message": "two"}]}
+                """)));
+
+        var context = contextFor(trigger(wireMock));
+        var execution = context.trigger().evaluate(context.conditionContext(), context.triggerContext()).orElseThrow();
+
+        assertThat((List<?>) execution.getTrigger().getVariables().get("documents"), hasSize(1));
+        assertThat("second 1700000002 must be read again in full", watermark(context), is("1700000002"));
+    }
+
+    @Test
+    void rejectsANonPositiveMaxHits(WireMockRuntimeInfo wireMock) {
+        var context = contextFor(Trigger.builder()
+            .id(IdUtils.create())
+            .type(TriggerTest.class.getName())
+            .url(Property.ofValue(url(wireMock)))
+            .index(Property.ofValue("app-logs"))
+            .query(Property.ofValue("severity:ERROR"))
+            .timestampField(Property.ofValue("timestamp"))
+            .maxHits(Property.ofValue(0))
+            .build());
+
+        var thrown = assertThrows(
+            IllegalArgumentException.class,
+            () -> context.trigger().evaluate(context.conditionContext(), context.triggerContext())
+        );
+        assertThat(thrown.getMessage(), is("`maxHits` must be at least 1, got 0"));
+    }
+
+    @Test
     void failsWhenADocumentMissesTheTimestampField(WireMockRuntimeInfo wireMock) {
         stubFor(post(urlPathEqualTo("/api/v1/app-logs/search")).willReturn(okJson(
             """
@@ -159,7 +207,7 @@ class TriggerTest extends AbstractQuickwitTest {
         trigger.evaluate(context.conditionContext(), context.triggerContext());
 
         verify(postRequestedFor(urlPathEqualTo("/api/v1/app-logs/search"))
-            .withRequestBody(equalToJson("{\"query\": \"severity:ERROR\", \"start_timestamp\": 1700000000, \"sort_by\": \"+timestamp\"}"))
+            .withRequestBody(equalToJson("{\"query\": \"severity:ERROR\", \"start_timestamp\": 1700000000, \"sort_by\": \"-timestamp\"}"))
         );
     }
 
@@ -171,7 +219,7 @@ class TriggerTest extends AbstractQuickwitTest {
         context.trigger().evaluate(context.conditionContext(), context.triggerContext());
 
         verify(postRequestedFor(urlPathEqualTo("/api/v1/app-logs/search"))
-            .withRequestBody(equalToJson("{\"query\": \"severity:ERROR\", \"sort_by\": \"+timestamp\"}"))
+            .withRequestBody(equalToJson("{\"query\": \"severity:ERROR\", \"sort_by\": \"-timestamp\"}"))
         );
     }
 
@@ -189,7 +237,10 @@ class TriggerTest extends AbstractQuickwitTest {
     /** The plugin trigger together with the context pair `TestsUtils.mockTrigger` builds for it. */
     private record Context(ConditionContext conditionContext, io.kestra.core.models.triggers.Trigger triggerContext, Trigger trigger) {
         String stateKey() {
-            return triggerContext.getNamespace() + "_" + triggerContext.getFlowId() + "_" + trigger.getId();
+            String namespace = triggerContext.getNamespace();
+            String flowId = triggerContext.getFlowId();
+
+            return namespace.length() + "-" + namespace + "_" + flowId.length() + "-" + flowId + "_" + trigger.getId().length() + "-" + trigger.getId();
         }
     }
 

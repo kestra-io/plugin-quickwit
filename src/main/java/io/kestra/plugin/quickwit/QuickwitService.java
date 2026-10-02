@@ -319,4 +319,18 @@ public final class QuickwitService {
 
         return value;
     }
+
+    /**
+     * Enforces a lower bound on a rendered numeric property. {@code @Min} cannot be used on a
+     * {@code Property<Integer>}: Hibernate Validator has no validator for it and fails with HV000030.
+     *
+     * @return the value, or {@code null} when unset
+     */
+    public static Integer requireAtLeast(Integer value, int min, String field) {
+        if (value != null && value < min) {
+            throw new IllegalArgumentException("`" + field + "` must be at least " + min + ", got " + value);
+        }
+
+        return value;
+    }
 }
