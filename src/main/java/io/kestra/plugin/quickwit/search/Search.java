@@ -171,6 +171,7 @@ public class Search extends AbstractQuickwitTask implements RunnableTask<Search.
         description = "Maximum number of documents to return. Quickwit defaults to `20`."
     )
     @PluginProperty(group = "processing")
+    @Min(0)
     private Property<Integer> maxHits;
 
     @Schema(
@@ -208,7 +209,7 @@ public class Search extends AbstractQuickwitTask implements RunnableTask<Search.
             `{"severity": {"terms": {"field": "severity"}}}`.
             """
     )
-    @PluginProperty(dynamic = true, group = "processing")
+    @PluginProperty(group = "processing")
     private Property<Map<String, Object>> aggregations;
 
     @Schema(

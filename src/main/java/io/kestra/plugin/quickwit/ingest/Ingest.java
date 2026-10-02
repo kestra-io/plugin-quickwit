@@ -136,7 +136,7 @@ public class Ingest extends AbstractQuickwitTask implements RunnableTask<Ingest.
             """
     )
     @NotNull
-    @PluginProperty(dynamic = true, group = "main")
+    @PluginProperty(group = "main")
     private Property<Object> from;
 
     @Schema(

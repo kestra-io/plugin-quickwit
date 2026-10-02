@@ -108,7 +108,7 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
             """
     )
     @NotNull
-    @PluginProperty(dynamic = true, group = "main")
+    @PluginProperty(group = "main")
     private Property<Map<String, Object>> docMapping;
 
     @Schema(
@@ -128,7 +128,7 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
             See [indexing settings](https://quickwit.io/docs/configuration/index-config#indexing-settings).
             """
     )
-    @PluginProperty(dynamic = true, group = "advanced")
+    @PluginProperty(group = "advanced")
     private Property<Map<String, Object>> indexingSettings;
 
     @Schema(
@@ -138,7 +138,7 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
             See [search settings](https://quickwit.io/docs/configuration/index-config#search-settings).
             """
     )
-    @PluginProperty(dynamic = true, group = "advanced")
+    @PluginProperty(group = "advanced")
     private Property<Map<String, Object>> searchSettings;
 
     @Schema(
@@ -148,7 +148,7 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
             See [retention policy](https://quickwit.io/docs/configuration/index-config#retention-policy).
             """
     )
-    @PluginProperty(dynamic = true, group = "advanced")
+    @PluginProperty(group = "advanced")
     private Property<Map<String, Object>> retention;
 
     @Override

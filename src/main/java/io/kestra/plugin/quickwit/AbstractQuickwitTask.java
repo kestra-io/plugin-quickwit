@@ -72,7 +72,8 @@ public abstract class AbstractQuickwitTask extends Task {
             """
     )
     @ToString.Exclude
-    @PluginProperty(group = "connection")
+    @EqualsAndHashCode.Exclude
+    @PluginProperty(group = "connection", secret = true)
     private Property<Map<String, String>> headers;
 
     @Schema(
@@ -196,6 +197,7 @@ public abstract class AbstractQuickwitTask extends Task {
             description = "Password for HTTP basic authentication."
         )
         @ToString.Exclude
+        @EqualsAndHashCode.Exclude
         @PluginProperty(group = "connection", secret = true)
         private Property<String> password;
     }

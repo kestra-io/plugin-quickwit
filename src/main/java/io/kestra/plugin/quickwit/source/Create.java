@@ -98,7 +98,7 @@ public class Create extends AbstractQuickwitSource implements RunnableTask<Creat
             """
     )
     @NotNull
-    @PluginProperty(dynamic = true, group = "main")
+    @PluginProperty(group = "main")
     private Property<Map<String, Object>> params;
 
     @Schema(

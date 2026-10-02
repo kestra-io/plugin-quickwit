@@ -151,7 +151,8 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             """
     )
     @ToString.Exclude
-    @PluginProperty(group = "connection")
+    @EqualsAndHashCode.Exclude
+    @PluginProperty(group = "connection", secret = true)
     private Property<Map<String, String>> headers;
 
     @Schema(
@@ -202,6 +203,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             """
     )
     @PluginProperty(group = "processing")
+    @Min(1)
     private Property<Integer> maxHits;
 
     @Schema(
@@ -239,7 +241,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             return Optional.empty();
         }
 
-        long advanced = Instant.now().getEpochSecond();
+        long advanced = maxTimestamp(documents, runContext.render(this.timestampField).as(String.class).orElseThrow(() -> new IllegalArgumentException("`timestampField` is required to advance the watermark"))) + 1;
         writeWatermark(runContext, key, advanced);
 
         logger.info("Triggering on {} new document(s) on index '{}'", documents.size(), query.index());
@@ -299,7 +301,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
 
     /** Default watermark key, aligned with the convention used by the other stateful Kestra triggers. */
     private static String defaultKey(String namespace, String flowId, String triggerId) {
-        return String.join("_", namespace, flowId, triggerId);
+        return String.format("%d:%s_%d:%s_%d:%s", namespace.length(), namespace, flowId.length(), flowId, triggerId.length(), triggerId);
     }
 
     @Builder
