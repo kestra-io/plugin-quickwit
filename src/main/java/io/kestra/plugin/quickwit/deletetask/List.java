@@ -64,17 +64,17 @@ public class List extends AbstractQuickwitTask implements RunnableTask<List.Outp
 
     @Override
     public List.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, this.index, "index");
+        String rIndex = required(runContext, this.index, "index");
 
-        HttpRequest request = request(runContext, "GET", pathSegment(renderedIndex) + "/delete-tasks", null).build();
+        HttpRequest request = request(runContext, "GET", pathSegment(rIndex) + "/delete-tasks", null).build();
 
         java.util.List<DeleteTask> deleteTasks;
         try (var client = client(runContext)) {
-            deleteTasks = executeList(client, request, DeleteTask.class, "listing of the delete tasks on index '" + renderedIndex + "'");
+            deleteTasks = executeList(client, request, DeleteTask.class, "listing of the delete tasks on index '" + rIndex + "'");
         }
 
         return Output.builder()
-            .index(renderedIndex)
+            .index(rIndex)
             .size(deleteTasks.size())
             .deleteTasks(deleteTasks)
             .build();

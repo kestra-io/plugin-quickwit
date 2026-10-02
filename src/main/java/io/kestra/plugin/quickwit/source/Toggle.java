@@ -72,8 +72,8 @@ public class Toggle extends AbstractQuickwitSource implements RunnableTask<Toggl
 
     @Override
     public Toggle.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
-        String renderedSource = required(runContext, getSource(), "source");
+        String rIndex = required(runContext, getIndex(), "index");
+        String rSource = required(runContext, getSource(), "source");
         boolean enableSource = runContext.render(this.enable).as(Boolean.class).orElseThrow(
             () -> new IllegalArgumentException("`enable` is required and must be `true` or `false`")
         );
@@ -81,19 +81,19 @@ public class Toggle extends AbstractQuickwitSource implements RunnableTask<Toggl
         HttpRequest request = request(
             runContext,
             "PUT",
-            "indexes/" + pathSegment(renderedIndex) + "/sources/" + pathSegment(renderedSource) + "/toggle",
+            "indexes/" + pathSegment(rIndex) + "/sources/" + pathSegment(rSource) + "/toggle",
             HttpRequest.JsonRequestBody.of(Map.of("enable", enableSource))
         ).build();
 
         try (var client = client(runContext)) {
-            executeIgnoringBody(client, request, "toggling of source '" + renderedSource + "' on index '" + renderedIndex + "'");
+            executeIgnoringBody(client, request, "toggling of source '" + rSource + "' on index '" + rIndex + "'");
         }
 
-        runContext.logger().info("{} source '{}' on index '{}'", enableSource ? "Enabled" : "Disabled", renderedSource, renderedIndex);
+        runContext.logger().info("{} source '{}' on index '{}'", enableSource ? "Enabled" : "Disabled", rSource, rIndex);
 
         return Output.builder()
-            .index(renderedIndex)
-            .source(renderedSource)
+            .index(rIndex)
+            .source(rSource)
             .enable(enableSource)
             .build();
     }

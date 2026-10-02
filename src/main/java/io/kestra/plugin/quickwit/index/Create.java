@@ -153,7 +153,7 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
 
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
+        String rIndex = required(runContext, getIndex(), "index");
         Map<String, Object> docMapping = requiredMap(
             runContext,
             this.docMapping,
@@ -164,7 +164,7 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
         // LinkedHashMap keeps the payload readable in logs and in the Quickwit API playground.
         Map<String, Object> configuration = new LinkedHashMap<>();
         putIfPresent(configuration, "version", runContext.render(this.configVersion).as(String.class).orElse(null));
-        configuration.put("index_id", renderedIndex);
+        configuration.put("index_id", rIndex);
         putIfPresent(configuration, "index_uri", runContext.render(this.indexUri).as(String.class).orElse(null));
         configuration.put("doc_mapping", docMapping);
         putIfPresent(configuration, "indexing_settings", runContext.render(this.indexingSettings).asMap(String.class, Object.class));
@@ -175,11 +175,11 @@ public class Create extends AbstractQuickwitIndex implements RunnableTask<Create
 
         IndexMetadata metadata;
         try (var client = client(runContext)) {
-            metadata = execute(client, request, IndexMetadata.class, "creation of index '" + renderedIndex + "'");
+            metadata = execute(client, request, IndexMetadata.class, "creation of index '" + rIndex + "'");
         }
 
         return Output.builder()
-            .index(renderedIndex)
+            .index(rIndex)
             .indexUid(metadata.getIndexUid())
             .createTimestamp(metadata.getCreateTimestamp())
             .metadata(metadata)

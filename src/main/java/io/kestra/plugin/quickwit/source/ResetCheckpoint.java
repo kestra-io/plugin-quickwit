@@ -60,25 +60,25 @@ import lombok.experimental.SuperBuilder;
 public class ResetCheckpoint extends AbstractQuickwitSource implements RunnableTask<ResetCheckpoint.Output> {
     @Override
     public ResetCheckpoint.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
-        String renderedSource = required(runContext, getSource(), "source");
+        String rIndex = required(runContext, getIndex(), "index");
+        String rSource = required(runContext, getSource(), "source");
 
         HttpRequest request = request(
             runContext,
             "PUT",
-            "indexes/" + pathSegment(renderedIndex) + "/sources/" + pathSegment(renderedSource) + "/reset-checkpoint",
+            "indexes/" + pathSegment(rIndex) + "/sources/" + pathSegment(rSource) + "/reset-checkpoint",
             null
         ).build();
 
         try (var client = client(runContext)) {
-            executeIgnoringBody(client, request, "checkpoint reset of source '" + renderedSource + "' on index '" + renderedIndex + "'");
+            executeIgnoringBody(client, request, "checkpoint reset of source '" + rSource + "' on index '" + rIndex + "'");
         }
 
-        runContext.logger().info("Reset the checkpoint of source '{}' on index '{}'", renderedSource, renderedIndex);
+        runContext.logger().info("Reset the checkpoint of source '{}' on index '{}'", rSource, rIndex);
 
         return Output.builder()
-            .index(renderedIndex)
-            .source(renderedSource)
+            .index(rIndex)
+            .source(rSource)
             .build();
     }
 

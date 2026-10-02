@@ -57,25 +57,25 @@ import lombok.experimental.SuperBuilder;
 public class Delete extends AbstractQuickwitSource implements RunnableTask<Delete.Output> {
     @Override
     public Delete.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
-        String renderedSource = required(runContext, getSource(), "source");
+        String rIndex = required(runContext, getIndex(), "index");
+        String rSource = required(runContext, getSource(), "source");
 
         HttpRequest request = request(
             runContext,
             "DELETE",
-            "indexes/" + pathSegment(renderedIndex) + "/sources/" + pathSegment(renderedSource),
+            "indexes/" + pathSegment(rIndex) + "/sources/" + pathSegment(rSource),
             null
         ).build();
 
         try (var client = client(runContext)) {
-            executeIgnoringBody(client, request, "deletion of source '" + renderedSource + "' on index '" + renderedIndex + "'");
+            executeIgnoringBody(client, request, "deletion of source '" + rSource + "' on index '" + rIndex + "'");
         }
 
-        runContext.logger().info("Deleted source '{}' from index '{}'", renderedSource, renderedIndex);
+        runContext.logger().info("Deleted source '{}' from index '{}'", rSource, rIndex);
 
         return Output.builder()
-            .index(renderedIndex)
-            .source(renderedSource)
+            .index(rIndex)
+            .source(rSource)
             .build();
     }
 

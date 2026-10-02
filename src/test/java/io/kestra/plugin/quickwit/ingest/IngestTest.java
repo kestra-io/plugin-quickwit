@@ -47,7 +47,6 @@ class IngestTest extends AbstractQuickwitTest {
         assertThat(output.getNumDocsForProcessing(), is(2L));
         assertThat(output.getNumIngestedDocs(), is(2L));
         assertThat(output.getNumRejectedDocs(), is(0L));
-        assertThat(output.getCommit(), is(Commit.AUTO));
         assertThat(output.getParseFailures(), is(org.hamcrest.Matchers.nullValue()));
     }
 

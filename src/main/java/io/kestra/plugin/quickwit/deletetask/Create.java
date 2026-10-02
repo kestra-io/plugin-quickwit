@@ -113,7 +113,7 @@ public class Create extends AbstractQuickwitTask implements RunnableTask<Create.
 
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, this.index, "index");
+        String rIndex = required(runContext, this.index, "index");
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("query", required(runContext, this.query, "query"));
@@ -130,17 +130,17 @@ public class Create extends AbstractQuickwitTask implements RunnableTask<Create.
         HttpRequest request = request(
             runContext,
             "POST",
-            pathSegment(renderedIndex) + "/delete-tasks",
+            pathSegment(rIndex) + "/delete-tasks",
             HttpRequest.JsonRequestBody.of(body)
         ).build();
 
         DeleteTask deleteTask;
         try (var client = client(runContext)) {
-            deleteTask = execute(client, request, DeleteTask.class, "creation of a delete task on index '" + renderedIndex + "'");
+            deleteTask = execute(client, request, DeleteTask.class, "creation of a delete task on index '" + rIndex + "'");
         }
 
         return Output.builder()
-            .index(renderedIndex)
+            .index(rIndex)
             .createTimestamp(deleteTask.getCreateTimestamp())
             .opstamp(deleteTask.getOpstamp())
             .deleteTask(deleteTask)

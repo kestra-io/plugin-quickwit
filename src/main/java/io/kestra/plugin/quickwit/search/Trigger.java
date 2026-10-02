@@ -2,7 +2,6 @@ package io.kestra.plugin.quickwit.search;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +31,7 @@ import io.kestra.plugin.quickwit.models.SearchResult;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -44,8 +44,13 @@ import lombok.experimental.SuperBuilder;
  *
  * <p>The trigger polls Quickwit on every {@code interval}. It remembers, in the namespace KV Store, the
  * timestamp up to which documents have already been delivered, and each poll searches
- * {@code timestamp >= watermark} before advancing it. A document is therefore never delivered twice,
- * while documents indexed late are still picked up on a later poll.
+ * {@code timestamp >= watermark} before advancing it to {@code max(delivered timestamp) + 1}.
+ * Polls sort ascending on {@code timestampField} so documents beyond {@code maxHits} are delivered on
+ * a later poll instead of being skipped.
+ *
+ * <p>Late documents whose event timestamp is already below the watermark are not picked up again,
+ * and documents sharing the boundary second of a burst larger than {@code maxHits} may be skipped:
+ * raise {@code maxHits} when bursts share a timestamp.
  */
 @SuperBuilder
 @ToString
@@ -58,8 +63,9 @@ import lombok.experimental.SuperBuilder;
         Polls a Quickwit index on a fixed interval and fires an execution as soon as documents matching
         the query appear.
 
-        The last delivered timestamp is kept in the namespace KV Store and advanced on every successful
-        poll, so a given document is only ever delivered once.
+        The last delivered timestamp is kept in the namespace KV Store and advanced to one past the
+        maximum delivered timestamp on every successful poll, so a given document is only ever
+        delivered once.
         """
 )
 @Plugin(
@@ -77,6 +83,7 @@ import lombok.experimental.SuperBuilder;
                     url: "https://quickwit.example.com:7280"
                     index: app-logs
                     query: "severity:ERROR"
+                    timestampField: timestamp
                     interval: PT5M
 
                 tasks:
@@ -100,6 +107,7 @@ import lombok.experimental.SuperBuilder;
                       Authorization: "Bearer {{ secret('QUICKWIT_GATEWAY_TOKEN') }}"
                     index: app-logs
                     query: "severity:ERROR AND service:checkout"
+                    timestampField: timestamp
                     interval: PT5M
                     maxHits: 500
 
@@ -193,17 +201,28 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private Property<String> query;
 
     @Schema(
+        title = "Timestamp field",
+        description = """
+            Document field holding the event timestamp in seconds, used to advance the watermark.
+            This should be the timestamp field of the index so `start_timestamp` pruning aligns.
+            Polls sort ascending on this field and advance to one past the maximum delivered value.
+            """
+    )
+    @NotNull
+    @PluginProperty(group = "main")
+    private Property<String> timestampField;
+
+    @Schema(
         title = "Maximum number of hits",
         description = """
             Maximum number of documents to fetch per poll. Quickwit defaults to `20`.
 
-            Raise it when documents are ingested in bursts. The watermark only advances after a
-            successful poll, so documents beyond this limit are delivered on a later poll instead of
-            being skipped.
+            Raise it when documents are ingested in bursts. Polls sort ascending on `timestampField`,
+            so documents beyond this limit are delivered on a later poll instead of being skipped,
+            unless a single second holds more documents than this limit.
             """
     )
     @PluginProperty(group = "processing")
-    @Min(1)
     private Property<Integer> maxHits;
 
     @Schema(
@@ -222,7 +241,11 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         RunContext runContext = conditionContext.getRunContext();
         Logger logger = runContext.logger();
 
-        SearchQuery query = searchQuery(runContext);
+        String rTimestampField = QuickwitService.requireNonBlank(
+            runContext.render(this.timestampField).as(String.class).orElse(null),
+            "timestampField"
+        );
+        SearchQuery query = searchQuery(runContext, rTimestampField);
         String key = stateKey(runContext, context);
 
         // absent watermark => first poll, which deliberately returns the whole current result set
@@ -241,14 +264,12 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             return Optional.empty();
         }
 
-        long advanced = maxTimestamp(documents, runContext.render(this.timestampField).as(String.class).orElseThrow(() -> new IllegalArgumentException("`timestampField` is required to advance the watermark"))) + 1;
+        long advanced = maxTimestamp(documents, rTimestampField) + 1;
         writeWatermark(runContext, key, advanced);
 
         logger.info("Triggering on {} new document(s) on index '{}'", documents.size(), query.index());
 
         Output output = Output.builder()
-            .index(query.index())
-            .query(query.query())
             .documents(documents)
             .numHits(result.getNumHits() != null ? result.getNumHits() : (long) documents.size())
             .elapsedTimeMicros(result.getElapsedTimeMicros())
@@ -258,12 +279,12 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         return Optional.of(TriggerService.generateExecution(this, conditionContext, context, output));
     }
 
-    private SearchQuery searchQuery(RunContext runContext) throws IllegalVariableEvaluationException {
-        return SearchQuery.of(
-            QuickwitService.requireNonBlank(runContext.render(this.index).as(String.class).orElse(null), "index"),
-            QuickwitService.requireNonBlank(runContext.render(this.query).as(String.class).orElse(null), "query"),
-            runContext.render(this.maxHits).as(Integer.class).orElse(null)
-        );
+    private SearchQuery searchQuery(RunContext runContext, String rTimestampField) throws IllegalVariableEvaluationException {
+        String rIndex = QuickwitService.requireNonBlank(runContext.render(this.index).as(String.class).orElse(null), "index");
+        String rQuery = QuickwitService.requireNonBlank(runContext.render(this.query).as(String.class).orElse(null), "query");
+        Integer rMaxHits = runContext.render(this.maxHits).as(Integer.class).orElse(null);
+
+        return new SearchQuery(rIndex, rQuery, null, null, null, rMaxHits, null, null, List.of("+" + rTimestampField), null);
     }
 
     private String stateKey(RunContext runContext, TriggerContext context) throws IllegalVariableEvaluationException {
@@ -275,18 +296,52 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     /**
      * Reads the last delivered timestamp.
      *
-     * <p>A missing or unreadable watermark simply means the next poll starts from the beginning, which
-     * is safer than skipping documents.
+     * <p>A missing watermark means the next poll starts from the beginning. Any other KV failure
+     * fails the evaluation so a poll never falls back to a full re-scan during a KV outage.
      */
-    private Optional<Long> readWatermark(RunContext runContext, String key) {
+    private Optional<Long> readWatermark(RunContext runContext, String key) throws Exception {
         try {
             return runContext.namespaceKv(runContext.flowInfo().namespace())
                 .getValue(key)
                 .map(value -> Long.parseLong(new String((byte[]) value.value(), StandardCharsets.UTF_8).trim()));
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
-            runContext.logger().warn("Unable to read the Quickwit search trigger watermark '{}', searching the whole window: {}", key, e.getMessage());
-            return Optional.empty();
+            throw new IllegalStateException("Unable to read the Quickwit search trigger watermark '" + key + "', failing the poll: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Maximum event timestamp across the delivered documents.
+     *
+     * @throws IllegalStateException when a document misses the timestamp field or holds a non-numeric value
+     */
+    private static long maxTimestamp(List<Map<String, Object>> documents, String timestampField) {
+        long max = Long.MIN_VALUE;
+
+        for (int i = 0; i < documents.size(); i++) {
+            Object value = documents.get(i).get(timestampField);
+            if (value == null) {
+                throw new IllegalStateException("Document at position " + i + " misses timestamp field '" + timestampField + "', cannot advance the watermark");
+            }
+
+            long timestamp;
+            if (value instanceof Number number) {
+                timestamp = number.longValue();
+            } else {
+                try {
+                    timestamp = Long.parseLong(String.valueOf(value).trim());
+                } catch (NumberFormatException e) {
+                    throw new IllegalStateException("Document at position " + i + " holds a non-numeric timestamp field '" + timestampField + "': " + value, e);
+                }
+            }
+
+            if (timestamp > max) {
+                max = timestamp;
+            }
+        }
+
+        return max;
     }
 
     private void writeWatermark(RunContext runContext, String key, long watermark) throws Exception {
@@ -301,24 +356,12 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
 
     /** Default watermark key, aligned with the convention used by the other stateful Kestra triggers. */
     private static String defaultKey(String namespace, String flowId, String triggerId) {
-        return String.format("%d:%s_%d:%s_%d:%s", namespace.length(), namespace, flowId.length(), flowId, triggerId.length(), triggerId);
+        return String.join("_", namespace, flowId, triggerId);
     }
 
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(
-            title = "Watched index",
-            description = "ID of the index that was polled."
-        )
-        private String index;
-
-        @Schema(
-            title = "Query",
-            description = "Query that selected the documents."
-        )
-        private String query;
-
         @Schema(
             title = "New documents",
             description = "Documents matching the query that no previous poll had delivered."

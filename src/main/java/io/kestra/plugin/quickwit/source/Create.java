@@ -120,8 +120,8 @@ public class Create extends AbstractQuickwitSource implements RunnableTask<Creat
 
     @Override
     public Create.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
-        String renderedSource = required(runContext, getSource(), "source");
+        String rIndex = required(runContext, getIndex(), "index");
+        String rSource = required(runContext, getSource(), "source");
         Map<String, Object> params = requiredMap(
             runContext,
             this.params,
@@ -131,7 +131,7 @@ public class Create extends AbstractQuickwitSource implements RunnableTask<Creat
 
         Map<String, Object> configuration = new LinkedHashMap<>();
         putIfPresent(configuration, "version", runContext.render(this.configVersion).as(String.class).orElse(null));
-        configuration.put("source_id", renderedSource);
+        configuration.put("source_id", rSource);
         configuration.put("source_type", required(runContext, this.sourceType, "sourceType"));
         configuration.put("params", params);
         putIfPresent(configuration, "num_pipelines", runContext.render(this.numPipelines).as(Integer.class).orElse(null));
@@ -140,17 +140,17 @@ public class Create extends AbstractQuickwitSource implements RunnableTask<Creat
         HttpRequest request = request(
             runContext,
             "POST",
-            "indexes/" + pathSegment(renderedIndex) + "/sources",
+            "indexes/" + pathSegment(rIndex) + "/sources",
             HttpRequest.JsonRequestBody.of(configuration)
         ).build();
 
         Source source;
         try (var client = client(runContext)) {
-            source = execute(client, request, Source.class, "creation of source '" + renderedSource + "' on index '" + renderedIndex + "'");
+            source = execute(client, request, Source.class, "creation of source '" + rSource + "' on index '" + rIndex + "'");
         }
 
         return Output.builder()
-            .index(renderedIndex)
+            .index(rIndex)
             .source(source)
             .build();
     }

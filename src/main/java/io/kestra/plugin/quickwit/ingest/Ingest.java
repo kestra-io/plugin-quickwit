@@ -163,7 +163,7 @@ public class Ingest extends AbstractQuickwitTask implements RunnableTask<Ingest.
 
     @Override
     public Ingest.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, this.index, "index");
+        String rIndex = required(runContext, this.index, "index");
 
         String ndjson = toNdjson(runContext);
         if (ndjson.isEmpty()) {
@@ -176,7 +176,7 @@ public class Ingest extends AbstractQuickwitTask implements RunnableTask<Ingest.
         HttpRequest request = request(
             runContext,
             "POST",
-            pathSegment(renderedIndex) + "/ingest",
+            pathSegment(rIndex) + "/ingest",
             Map.of(
                 "commit", commit.name().toLowerCase(Locale.ROOT),
                 "detailed_response", detailed
@@ -192,7 +192,7 @@ public class Ingest extends AbstractQuickwitTask implements RunnableTask<Ingest.
 
         IngestResult result;
         try (var client = client(runContext)) {
-            result = execute(client, request, IngestResult.class, "ingest into index '" + renderedIndex + "'");
+            result = execute(client, request, IngestResult.class, "ingest into index '" + rIndex + "'");
         }
 
         long ingested = orZero(result.getNumIngestedDocs());
@@ -200,11 +200,10 @@ public class Ingest extends AbstractQuickwitTask implements RunnableTask<Ingest.
         runContext.metric(Counter.of("records", ingested + rejected));
 
         if (rejected > 0) {
-            runContext.logger().warn("Quickwit rejected {} document(s) out of {} submitted to index '{}'", rejected, orZero(result.getNumDocsForProcessing()), renderedIndex);
+            runContext.logger().warn("Quickwit rejected {} document(s) out of {} submitted to index '{}'", rejected, orZero(result.getNumDocsForProcessing()), rIndex);
         }
 
         return Output.builder()
-            .commit(commit)
             .numDocsForProcessing(orZero(result.getNumDocsForProcessing()))
             .numIngestedDocs(ingested)
             .numRejectedDocs(rejected)
@@ -244,12 +243,6 @@ public class Ingest extends AbstractQuickwitTask implements RunnableTask<Ingest.
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(
-            title = "Commit behavior",
-            description = "The commit behavior applied to this ingest call."
-        )
-        private Commit commit;
-
         @Schema(
             title = "Documents submitted",
             description = "Number of documents submitted for processing. They may not be searchable yet."

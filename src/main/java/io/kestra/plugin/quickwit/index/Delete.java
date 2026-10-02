@@ -62,19 +62,19 @@ import lombok.experimental.SuperBuilder;
 public class Delete extends AbstractQuickwitIndex implements RunnableTask<Delete.Output> {
     @Override
     public Delete.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
+        String rIndex = required(runContext, getIndex(), "index");
 
-        HttpRequest request = request(runContext, "DELETE", "indexes/" + pathSegment(renderedIndex), null).build();
+        HttpRequest request = request(runContext, "DELETE", "indexes/" + pathSegment(rIndex), null).build();
 
         List<DeletedSplit> deletedSplits;
         try (var client = client(runContext)) {
-            deletedSplits = executeList(client, request, DeletedSplit.class, "deletion of index '" + renderedIndex + "'");
+            deletedSplits = executeList(client, request, DeletedSplit.class, "deletion of index '" + rIndex + "'");
         }
 
-        runContext.logger().info("Deleted index '{}' and {} split file(s)", renderedIndex, deletedSplits.size());
+        runContext.logger().info("Deleted index '{}' and {} split file(s)", rIndex, deletedSplits.size());
 
         return Output.builder()
-            .index(renderedIndex)
+            .index(rIndex)
             .size(deletedSplits.size())
             .deletedSplits(deletedSplits)
             .build();

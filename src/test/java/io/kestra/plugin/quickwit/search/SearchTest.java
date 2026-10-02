@@ -52,7 +52,6 @@ class SearchTest extends AbstractQuickwitTest {
             .build()
             .run(runContextFactory.of());
 
-        assertThat(output.getFetchType(), is(FetchType.FETCH));
         assertThat(output.getTotal(), is(2L));
         assertThat(output.getSize(), is(2));
         assertThat(output.getRows(), hasSize(2));

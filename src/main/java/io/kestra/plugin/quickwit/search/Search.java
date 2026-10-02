@@ -171,7 +171,6 @@ public class Search extends AbstractQuickwitTask implements RunnableTask<Search.
         description = "Maximum number of documents to return. Quickwit defaults to `20`."
     )
     @PluginProperty(group = "processing")
-    @Min(0)
     private Property<Integer> maxHits;
 
     @Schema(
@@ -263,7 +262,6 @@ public class Search extends AbstractQuickwitTask implements RunnableTask<Search.
         FetchType fetchType = runContext.render(this.fetchType).as(FetchType.class).orElse(FetchType.FETCH);
 
         return Output.builder()
-            .fetchType(fetchType)
             .total(result.getNumHits() != null ? result.getNumHits() : (long) hits.size())
             .size(fetchType == FetchType.NONE ? 0 : hits.size())
             .rows(fetchType == FetchType.FETCH ? hits : null)
@@ -345,11 +343,5 @@ public class Search extends AbstractQuickwitTask implements RunnableTask<Search.
             description = "Non-fatal errors reported by Quickwit while executing the query."
         )
         private List<String> errors;
-
-        @Schema(
-            title = "Result handling mode",
-            description = "The fetch type that was applied to produce these outputs."
-        )
-        private FetchType fetchType;
     }
 }

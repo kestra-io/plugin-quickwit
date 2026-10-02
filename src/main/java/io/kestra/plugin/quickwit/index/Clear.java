@@ -59,19 +59,19 @@ import lombok.experimental.SuperBuilder;
 public class Clear extends AbstractQuickwitIndex implements RunnableTask<Clear.Output> {
     @Override
     public Clear.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
+        String rIndex = required(runContext, getIndex(), "index");
 
         // Quickwit documents this endpoint as returning an empty body.
-        HttpRequest request = request(runContext, "PUT", "indexes/" + pathSegment(renderedIndex) + "/clear", null).build();
+        HttpRequest request = request(runContext, "PUT", "indexes/" + pathSegment(rIndex) + "/clear", null).build();
 
         try (var client = client(runContext)) {
-            executeIgnoringBody(client, request, "clearing of index '" + renderedIndex + "'");
+            executeIgnoringBody(client, request, "clearing of index '" + rIndex + "'");
         }
 
-        runContext.logger().info("Cleared index '{}': all splits deleted and source checkpoints reset", renderedIndex);
+        runContext.logger().info("Cleared index '{}': all splits deleted and source checkpoints reset", rIndex);
 
         return Output.builder()
-            .index(renderedIndex)
+            .index(rIndex)
             .build();
     }
 

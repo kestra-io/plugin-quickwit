@@ -57,17 +57,17 @@ import lombok.experimental.SuperBuilder;
 public class Get extends AbstractQuickwitIndex implements RunnableTask<Get.Output> {
     @Override
     public Get.Output run(RunContext runContext) throws Exception {
-        String renderedIndex = required(runContext, getIndex(), "index");
+        String rIndex = required(runContext, getIndex(), "index");
 
-        HttpRequest request = request(runContext, "GET", "indexes/" + pathSegment(renderedIndex), null).build();
+        HttpRequest request = request(runContext, "GET", "indexes/" + pathSegment(rIndex), null).build();
 
         IndexMetadata metadata;
         try (var client = client(runContext)) {
-            metadata = execute(client, request, IndexMetadata.class, "read of index '" + renderedIndex + "'");
+            metadata = execute(client, request, IndexMetadata.class, "read of index '" + rIndex + "'");
         }
 
         return Output.builder()
-            .index(renderedIndex)
+            .index(rIndex)
             .indexUid(metadata.getIndexUid())
             .createTimestamp(metadata.getCreateTimestamp())
             .metadata(metadata)
