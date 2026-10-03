@@ -1,0 +1,8 @@
+group: io.kestra.plugin.quickwit.ingest
+name: "ingest"
+title: "Quickwit Ingest"
+description: "Send a batch of documents to a Quickwit index as NDJSON, from a Kestra file, an inline list or a JSON string."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

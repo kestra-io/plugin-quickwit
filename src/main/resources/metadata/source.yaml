@@ -1,0 +1,8 @@
+group: io.kestra.plugin.quickwit.source
+name: "source"
+title: "Quickwit Sources"
+description: "Manage the Kafka, Kinesis and Pulsar sources that feed a Quickwit index: create, pause, resume, reset checkpoints and detach."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

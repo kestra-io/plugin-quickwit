@@ -1,0 +1,11 @@
+# Named with the root-relative dotted package path: a leaf-named `index.yaml` here would collide
+# with the root metadata file of the plugin, and the doc linter would then validate the root file
+# against the group of this subpackage.
+group: io.kestra.plugin.quickwit.index
+name: "index"
+title: "Quickwit Indexes"
+description: "Create, inspect, clear and delete Quickwit indexes, and manage their doc mapping and retention policy."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

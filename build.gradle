@@ -13,6 +13,15 @@ plugins {
 
 def isBuildSnapshot = version.toString().endsWith("-SNAPSHOT")
 
+pluginDocLint {
+    // META-004 cross-checks that each metadata file declares the group of the package it documents.
+    // It cannot be applied to this plugin: a subpackage is literally named `index`, so the linter
+    // resolves its metadata to `metadata/index.yaml`, which is also the very file the rule itself
+    // requires for the plugin root. Both candidate names collide and there is no third option.
+    // The invariant is still enforced, by MetadataConsistencyTest.
+    disabledRules = ['META-004']
+}
+
 repositories {
     mavenLocal()
     mavenCentral()
@@ -87,6 +96,9 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
+
+    // stubs the Quickwit REST API so every task and the trigger are tested without a live cluster
+    testImplementation "org.wiremock:wiremock-jetty12"
 }
 
 /**********************************************************************************************************************\
