@@ -226,7 +226,6 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
             """
     )
     @PluginProperty(group = "processing")
-    @Min(1)
     private Property<Integer> maxHits;
 
     @Schema(
