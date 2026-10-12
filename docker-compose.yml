@@ -3,7 +3,7 @@ services:
   # cluster. The REST API answers on 7280, which is the port the task examples use.
   # https://quickwit.io/docs/get-started/installation
   quickwit:
-    image: quickwit/quickwit:latest
+    image: quickwit/quickwit:0.8.2
     # the image entrypoint is a bare `quickwit`, so without this the container prints its usage and exits
     command: run
     environment:

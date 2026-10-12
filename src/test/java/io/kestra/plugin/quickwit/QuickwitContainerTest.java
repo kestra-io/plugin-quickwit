@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assumptions.abort;
 @KestraTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class QuickwitContainerTest {
-    private static final GenericContainer<?> QUICKWIT = new GenericContainer<>(DockerImageName.parse("quickwit/quickwit:latest"))
+    private static final GenericContainer<?> QUICKWIT = new GenericContainer<>(DockerImageName.parse("quickwit/quickwit:0.8.2"))
         .withCommand("run")
         .withEnv("QW_CLUSTER_ID", "quickwit-it")
         .withEnv("QW_NODE_ID", "quickwit-node-1")
