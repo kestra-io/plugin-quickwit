@@ -1,0 +1,23 @@
+id: quickwit_ingest
+namespace: company.team
+
+tasks:
+  - id: ingest
+    type: io.kestra.plugin.quickwit.ingest.Ingest
+    url: "http://localhost:7280"
+    index: app-logs
+    commit: FORCE
+    detailedResponse: true
+    from:
+      - timestamp: "{{ now() | timestamp }}"
+        service: checkout
+        severity: ERROR
+        message: "Payment gateway timeout"
+      - timestamp: "{{ now() | timestamp }}"
+        service: checkout
+        severity: ERROR
+        message: "Payment gateway timeout"
+
+  - id: check
+    type: io.kestra.plugin.core.log.Log
+    message: "Ingested {{ outputs.ingest.numIngestedDocs }} / rejected {{ outputs.ingest.numRejectedDocs }}"

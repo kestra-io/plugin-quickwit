@@ -1,0 +1,16 @@
+id: quickwit_search
+namespace: company.team
+
+tasks:
+  - id: search
+    type: io.kestra.plugin.quickwit.search.Search
+    url: "https://quickwit.example.com:7280"
+    index: app-logs
+    query: "severity:ERROR"
+    startTimestamp: "{{ now() | dateAdd(-1, 'HOURS') | timestamp }}"
+    maxHits: 100
+    fetchType: FETCH
+
+  - id: log_count
+    type: io.kestra.plugin.core.log.Log
+    message: "Found {{ outputs.search.size }} errors"

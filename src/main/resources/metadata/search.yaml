@@ -1,0 +1,8 @@
+group: io.kestra.plugin.quickwit.search
+name: "search"
+title: "Quickwit Search"
+description: "Query Quickwit indexes and react to new documents with a polling trigger backed by a KV store watermark."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

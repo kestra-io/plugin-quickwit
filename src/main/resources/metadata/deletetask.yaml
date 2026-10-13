@@ -1,0 +1,8 @@
+group: io.kestra.plugin.quickwit.deletetask
+name: "deletetask"
+title: "Quickwit Delete Tasks"
+description: "Delete documents from a Quickwit index by query, and inspect the delete tasks queued on an index."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

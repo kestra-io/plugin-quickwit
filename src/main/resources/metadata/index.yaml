@@ -1,7 +1,7 @@
 group: io.kestra.plugin.quickwit
 name: "quickwit"
 title: "Quickwit"
-description: "Quickwit plugin for Kestra"
+description: "Search, ingest and manage indexes of a Quickwit cluster: the cloud-native search engine for logs and traces."
 body: ""
 videos: []
 createdBy: "Kestra Core Team"
