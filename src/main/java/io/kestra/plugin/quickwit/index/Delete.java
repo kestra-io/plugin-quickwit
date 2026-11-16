@@ -33,7 +33,7 @@ import lombok.experimental.SuperBuilder;
         Deletes an index: its splits are removed from the metastore and from the storage.
 
         This cannot be undone. Use
-        [Clear](https://kestra.io/docs/plugins/plugin-quickwit/io.kestra.plugin.quickwit.index.Clear) to keep the
+        [Clear](https://kestra.io/plugins/plugin-quickwit/quickwit-indexes/io.kestra.plugin.quickwit.index.clear) to keep the
         index definition and only drop its data.
         """
 )
